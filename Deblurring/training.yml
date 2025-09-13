@@ -1,6 +1,6 @@
 ###############
-## 
-####
+## Training Config for MPRNet
+###############
 
 GPU: [0,1,2,3]
 
@@ -24,7 +24,15 @@ TRAINING:
   RESUME: False
   TRAIN_PS: 256
   VAL_PS: 256
-  TRAIN_DIR: './Datasets/GoPro/train' # path to training data
-  VAL_DIR: './Datasets/GoPro/test'    # path to validation data
+
+  # ✅ Now supports multiple datasets (GoPro + HIDE_split)
+  TRAIN_DIR:
+    - '/content/drive/MyDrive/GOPRO/train'
+    - '/content/drive/MyDrive/HIDE_split/train'
+
+  VAL_DIR:
+    - '/content/drive/MyDrive/GOPRO/test'
+    - '/content/drive/MyDrive/HIDE_split/test'
+
   SAVE_DIR: './checkpoints'     # path to save models and images
   # SAVE_IMAGES: False
