@@ -7,51 +7,50 @@ from skimage import img_as_ubyte
 import os
 from runpy import run_path
 
-# Define the image processing function
 def process_image(uploaded_image, task):
-    # Convert the uploaded image to an actual image file
     img = Image.open(uploaded_image).convert('RGB')
     input_ = TF.to_tensor(img).unsqueeze(0).cuda()
 
-    # Define model loading
-    load_file = run_path(os.path.join(task, "MPRNet.py"))
-    model = load_file['MPRNet']()
-    model.cuda()
+    # Load the correct model file
+    if task == "Deblurring":
+        weights = os.path.join("Deblurring", "pretrained_models", "deblurring.pth")
+    elif task == "Denoising":
+        weights = os.path.join("Denoising", "pretrained_models", "denoising.pth")
+    elif task == "Deraining":
+        weights = os.path.join("Deraining", "pretrained_models", "deraining.pth")
 
-    weights = os.path.join(task, "pretrained_models", "model_" + task.lower() + ".pth")
+    # Load the model definition
+    load_file = run_path(os.path.join(task, "MPRNet.py"))
+    model = load_file["MPRNet"]().cuda()
+
+    # Load pretrained weights
     checkpoint = torch.load(weights)
     try:
         model.load_state_dict(checkpoint["state_dict"])
     except:
-        state_dict = checkpoint["state_dict"]
-        new_state_dict = {}
-        for k, v in state_dict.items():
-            name = k[7:]  # Remove `module.`
-            new_state_dict[name] = v
-        model.load_state_dict(new_state_dict)
+        new_state = {}
+        for k, v in checkpoint["state_dict"].items():
+            new_state[k.replace("module.", "")] = v
+        model.load_state_dict(new_state)
 
     model.eval()
 
-    # Pad the input if not multiple of 8
+    # Pad to multiple of 8
     img_multiple_of = 8
     h, w = input_.shape[2], input_.shape[3]
     H = ((h + img_multiple_of) // img_multiple_of) * img_multiple_of
     W = ((w + img_multiple_of) // img_multiple_of) * img_multiple_of
-    padh = H - h if h % img_multiple_of != 0 else 0
-    padw = W - w if w % img_multiple_of != 0 else 0
+    padh, padw = H - h, W - w
     input_ = F.pad(input_, (0, padw, 0, padh), 'reflect')
 
     with torch.no_grad():
-        restored = model(input_)
-    restored = restored[0]
-    restored = torch.clamp(restored, 0, 1)
-
-    # Unpad the output
-    restored = restored[:, :, :h, :w]
-    restored = restored.permute(0, 2, 3, 1).cpu().detach().numpy()
+        restored = model(input_)[0]
+    restored = torch.clamp(restored, 0, 1)[:, :, :h, :w]
+    restored = restored.permute(0, 2, 3, 1).cpu().numpy()
     restored = img_as_ubyte(restored[0])
 
     return restored
+
 
 # Create the Streamlit app
 def main():
